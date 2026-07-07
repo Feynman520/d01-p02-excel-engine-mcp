@@ -17,8 +17,8 @@ Excel.Application 데스크톱을 COM으로 자동화해, **라이브러리(open
 ## 설치
 
 ```powershell
-git clone https://github.com/Feynman520/excel-engine-mcp.git
-cd excel-engine-mcp
+git clone https://github.com/Feynman520/d01-p02-excel-engine-mcp.git
+cd d01-p02-excel-engine-mcp
 py -3.12 -m venv .venv          # 또는: python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
