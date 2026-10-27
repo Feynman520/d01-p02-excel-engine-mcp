@@ -97,6 +97,12 @@ def main():
         with open(pdf, "rb") as f:
             head = f.read(5)
         check(head == b"%PDF-", "export_pdf(시트 하나) → PDF")
+        kpdf = os.path.join(tmp, "out", "korean.pdf")
+        s.run(lambda a: wb.export_pdf(a, src, kpdf, sheet="계산"))
+        with open(kpdf, "rb") as f:
+            kdata = f.read()
+        check(any(k in kdata for k in (b"AppleSDGothic", b"Nanum", b"AppleMyungjo", b"AppleGothic")),
+              "한글 셀이 있는 시트의 PDF 에 한글 글꼴이 박혔다(시스템 글꼴을 본다 — fonts.conf)")
         try:
             s.run(lambda a: wb.export_pdf(a, src, os.path.join(tmp, "x.png")))
             check(False, "PDF 아닌 확장자는 거부")

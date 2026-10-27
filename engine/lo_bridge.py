@@ -8,6 +8,9 @@ LibreOffice 로 처리한다. 실제 작업은 soffice 안에서 도는 UNO 매�
 
   · 프로필: IRIS_LO_PROFILE_DIR 또는 이 저장소의 `.lo-profile/`(사용자가 쓰는 LibreOffice 설정과 섞이지 않게).
     매크로는 그 프로필의 user/Scripts/python/ 에 복사해 둔다(내용이 같으면 손대지 않음).
+  · 글꼴: 화면 없는 LibreOffice 는 macOS 글꼴 시스템이 아니라 fontconfig 로 글꼴을 찾아 시스템 글꼴(한글 포함)을
+    하나도 못 본다 — 한글이 □ 로 나온다(2026-10-27 실측). 그래서 시스템 글꼴 폴더를 적은 fonts.conf 를 프로필에
+    만들어 FONTCONFIG_FILE 로 넘긴다(사용자가 FONTCONFIG_FILE 을 이미 정했으면 그것을 쓴다).
   · 한 번에 하나: 같은 프로필의 soffice 가 떠 있으면 새 실행이 그쪽에 요청만 넘기고 끝나 버리므로 직렬화한다.
   · 시간 초과면 그 soffice 프로세스 그룹만 끝낸다(이 파일이 띄운 것만).
 
@@ -33,6 +36,14 @@ REPO = os.path.dirname(HERE)
 MACRO_SRC = os.path.join(HERE, "lo_macro", "iris_uno.py")
 SCRIPT_URL = "vnd.sun.star.script:iris_uno.py$run?language=Python&location=user"
 DEFAULT_TIMEOUT = float(os.environ.get("IRIS_LO_TIMEOUT", "240"))
+
+FONT_DIRS = (
+    "/System/Library/Fonts",
+    "/System/Library/Fonts/Supplemental",
+    "/System/Library/AssetsV2/com_apple_MobileAsset_Font7",  # 내려받기 글꼴(나눔 등)이 여기에 온다
+    "/Library/Fonts",
+    os.path.expanduser("~/Library/Fonts"),
+)
 
 _CANDIDATES = (
     "/Applications/LibreOffice.app/Contents/MacOS/soffice",
@@ -86,6 +97,23 @@ class LoBridge:
             f.write(want)
         os.replace(tmp, dst)
 
+    def _fontconfig(self) -> str:
+        conf = os.path.join(self.profile, "fonts.conf")
+        from xml.sax.saxutils import escape
+        dirs = "".join(f"  <dir>{escape(d)}</dir>\n" for d in FONT_DIRS if os.path.isdir(d))
+        text = ('<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">\n<fontconfig>\n'
+                f"{dirs}  <cachedir>{escape(os.path.join(self.profile, 'fontconfig-cache'))}</cachedir>\n</fontconfig>\n")
+        try:
+            with open(conf, "r", encoding="utf-8") as f:
+                if f.read() == text:
+                    return conf
+        except OSError:
+            pass
+        os.makedirs(self.profile, exist_ok=True)
+        with open(conf, "w", encoding="utf-8") as f:
+            f.write(text)
+        return conf
+
     def run(self, op: str, timeout: float = DEFAULT_TIMEOUT, **job: Any) -> dict:
         if not self.soffice:
             raise LibreOfficeMissing(missing_message())
@@ -98,6 +126,8 @@ class LoBridge:
                 with open(job_path, "w", encoding="utf-8") as f:
                     json.dump({"op": op, **job}, f, ensure_ascii=False)
                 env = {**os.environ, "IRIS_LO_JOB": job_path, "IRIS_LO_RESULT": result_path}
+                if not env.get("FONTCONFIG_FILE"):
+                    env["FONTCONFIG_FILE"] = self._fontconfig()
                 profile_url = pathlib.Path(self.profile).as_uri()  # 공백·한글도 올바르게 퍼센트 인코딩
                 cmd = [self.soffice, f"-env:UserInstallation={profile_url}", "--headless", "--invisible",
                        "--norestore", "--nologo", "--nodefault", "--nolockcheck", SCRIPT_URL]

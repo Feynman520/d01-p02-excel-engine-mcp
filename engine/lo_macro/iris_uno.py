@@ -297,31 +297,40 @@ def impress_pdf(office, job):
         _close(doc)
 
 
+IMAGE_TYPES = {"PNG": ("png", "image/png"), "JPG": ("jpg", "image/jpeg"), "JPEG": ("jpg", "image/jpeg"),
+               "GIF": ("gif", "image/gif"), "BMP": ("bmp", "image/bmp"), "TIF": ("tif", "image/tiff")}
+
+
 def impress_images(office, job):
+    """슬라이드마다 이미지 한 장: out_dir/slide_001.<ext> … (PowerPoint 판 export_images 와 같은 이름·같은 반환).
+    width·height 를 둘 다 주면 그 크기, 아니면 슬라이드 크기를 96dpi 로(PowerPoint 기본과 같은 기준)."""
+    fmt = (job.get("fmt") or "PNG").upper()
+    if fmt not in IMAGE_TYPES:
+        raise ValueError("지원하지 않는 형식: %s (가능: %s)" % (fmt, ", ".join(IMAGE_TYPES)))
+    ext, media = IMAGE_TYPES[fmt]
     doc = office.load(job["src"], read_only=True)
     try:
         pages = doc.getDrawPages()
-        fmt = (job.get("format") or "png").lower()
-        media = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg"}.get(fmt)
-        if not media:
-            raise ValueError("지원하지 않는 이미지 형식입니다: %s" % fmt)
-        out_dir = job["out_dir"]
+        out_dir = os.path.abspath(job["out_dir"])
         os.makedirs(out_dir, exist_ok=True)
-        width = int(job.get("width") or 1920)
+        width, height = job.get("width"), job.get("height")
         exporter = office.smgr.createInstanceWithContext("com.sun.star.drawing.GraphicExportFilter", office.ctx)
         files = []
-        slides = job.get("slides")  # 1-기반 번호 목록(없으면 전부)
         for i in range(pages.getCount()):
-            if slides and (i + 1) not in slides:
-                continue
             page = pages.getByIndex(i)
-            height = int(round(width * page.Height / float(page.Width)))
-            out = os.path.join(out_dir, "%s%03d.%s" % (job.get("prefix") or "slide", i + 1, "jpg" if fmt == "jpeg" else fmt))
+            if width and height:
+                pw, ph = int(width), int(height)
+            else:  # 1/100 mm → 96dpi 픽셀
+                pw, ph = int(round(page.Width / 2540.0 * 96)), int(round(page.Height / 2540.0 * 96))
+            out = os.path.join(out_dir, "slide_%03d.%s" % (i + 1, ext))
             exporter.setSourceDocument(page)
             exporter.filter(_props(URL=_url(out), MediaType=media, FilterData=uno.Any(
-                "[]com.sun.star.beans.PropertyValue", _props(PixelWidth=width, PixelHeight=height))))
-            files.append(os.path.abspath(out))
-        return {"out_dir": os.path.abspath(out_dir), "files": files, "slides": pages.getCount()}
+                "[]com.sun.star.beans.PropertyValue", _props(PixelWidth=pw, PixelHeight=ph))))
+            files.append(out)
+        missing = [f for f in files if not os.path.exists(f)]
+        if missing:
+            raise RuntimeError("이미지 일부 미생성: %s ..." % missing[:3])
+        return {"out_dir": out_dir, "count": len(files), "files": files}
     finally:
         _close(doc)
 
