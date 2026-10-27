@@ -16,6 +16,17 @@ A local MCP server that drives the **real Excel desktop application** (COM autom
 - Python 3.10+ — verified on **3.12**
 - [Claude Code](https://claude.com/claude-code) or any MCP client
 
+## macOS (LibreOffice engine)
+
+On macOS there is no COM, so the same five tools run on **LibreOffice** (free, MPL-2.0) in headless mode:
+`server.py` picks `engine/lo_workbook.py` + `engine/lo_bridge.py` instead of the COM session.
+
+- Install LibreOffice (`brew install --cask libreoffice`, or from libreoffice.org). `IRIS_SOFFICE` may point at another `soffice`.
+- Each call starts `soffice` once with a private profile (`.lo-profile/`, or `IRIS_LO_PROFILE_DIR`) and runs a UNO macro
+  (`engine/lo_macro/iris_uno.py`) inside it — LibreOffice 26's bundled Python can only be launched by `soffice` itself.
+- Calculation is LibreOffice Calc's: Excel-only functions are computed only as far as LibreOffice supports them.
+- Check: `python tests/lo_engine.py` (builds an xlsx whose cached value is stale and proves the recalculation ran).
+
 ## Install
 
 ```powershell

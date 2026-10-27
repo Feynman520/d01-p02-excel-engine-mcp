@@ -23,8 +23,15 @@ from typing import Any, Optional
 import anyio
 from mcp.server.fastmcp import FastMCP
 
-from engine import workbook
-from engine.session import ExcelSession
+import sys
+
+if sys.platform == "win32":
+    from engine import workbook
+    from engine.session import ExcelSession
+else:
+    # macOS: Excel COM 이 없다 — 같은 도구를 LibreOffice(무료) 계산·렌더 엔진으로 처리한다(engine/lo_bridge.py).
+    from engine import lo_workbook as workbook
+    from engine.lo_bridge import LoSession as ExcelSession
 
 # ---- 단일 세션 관리(지연 초기화) -------------------------------------------
 _session: Optional[ExcelSession] = None
@@ -65,6 +72,8 @@ mcp = FastMCP(
         "일반 흐름: (openpyxl 등으로 입력값을 쓴 파일을) excel_recalculate로 재계산 → "
         "excel_read_values로 실측값 확인 → excel_export_pdf로 PDF 출력. "
         "경로는 절대경로 권장. 원본은 보존되며 결과는 out_path로 저장된다."
+        + ("" if sys.platform == "win32" else
+           " (macOS: Excel 대신 LibreOffice Calc 엔진으로 계산·출력한다. Excel 전용 함수는 LibreOffice 가 지원하는 범위에서만 계산된다.)")
     ),
 )
 

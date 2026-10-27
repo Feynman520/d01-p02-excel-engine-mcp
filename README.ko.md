@@ -14,6 +14,17 @@ Excel.Application 데스크톱을 COM으로 자동화해, **라이브러리(open
 - Python 3.10+ — 검증: **3.12**
 - [Claude Code](https://claude.com/claude-code) 또는 임의의 MCP 클라이언트
 
+## macOS (LibreOffice 엔진)
+
+macOS 에는 COM 이 없어 같은 도구 5개를 **LibreOffice**(무료, MPL-2.0)를 화면 없이 띄워 처리한다 —
+`server.py` 가 COM 세션 대신 `engine/lo_workbook.py` + `engine/lo_bridge.py` 를 고른다.
+
+- LibreOffice 설치(`brew install --cask libreoffice` 또는 libreoffice.org). 다른 `soffice` 는 `IRIS_SOFFICE` 로 지정.
+- 호출마다 전용 프로필(`.lo-profile/` 또는 `IRIS_LO_PROFILE_DIR`)로 `soffice` 를 한 번 띄우고 그 안에서 UNO 매크로
+  (`engine/lo_macro/iris_uno.py`)를 돌린다 — LibreOffice 26 의 내장 Python 은 `soffice` 만 띄울 수 있다.
+- 계산은 LibreOffice Calc 엔진이 한다: Excel 전용 함수는 LibreOffice 가 지원하는 범위에서만 계산된다.
+- 검사: `python tests/lo_engine.py`(저장값이 틀린 xlsx 를 만들어 재계산이 실제로 돌았음을 증명).
+
 ## 설치
 
 ```powershell
